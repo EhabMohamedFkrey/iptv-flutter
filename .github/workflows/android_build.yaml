@@ -28,10 +28,7 @@ jobs:
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # === إزالة خطوة 5 (إعادة البناء) لأنها تسبب مشاكل ===
-    
-    # 5. Fix Android Build System (Temporary Fix for broken setup)
-    # هذا يضمن وجود مجلدات build/app/outputs
+    # 5. Prepare Android Environment (التهيئة النهائية)
     - name: 5. Prepare Android Environment
       run: |
         # التأكد من صلاحية ملف settings.gradle لربط المكتبات
@@ -50,8 +47,8 @@ jobs:
         fi
         
     - name: 7. Build Android APK (Release)
-      # نستخدم خيار --no-build-cleanup لمنع الخادم من حذف الملفات الهامة
-      run: flutter build apk --release --no-build-cleanup
+      # الرجوع إلى الأمر البسيط والموثوق
+      run: flutter build apk --release
 
     - name: 8. Upload APK Artifact
       uses: actions/upload-artifact@v4
@@ -60,7 +57,7 @@ jobs:
         path: build/app/outputs/flutter/apk/app-release.apk
         
     - name: 9. Build Android AAB (App Bundle for Play Store)
-      run: flutter build appbundle --release --no-build-cleanup
+      run: flutter build appbundle --release
 
     - name: 10. Upload AAB Artifact
       uses: actions/upload-artifact@v4
