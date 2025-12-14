@@ -28,39 +28,19 @@ jobs:
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # === الخطوة الحـاسمة: إعادة بناء هيكل الأندرويد بالكامل ===
-    - name: 5. Rebuild and Patch Android Structure
-      run: |
-        # 1. نسخ ملفاتنا المخصصة جانباً
-        cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml
-        cp android/app/build.gradle /tmp/app_build.gradle
-        cp android/build.gradle /tmp/project_build.gradle
-        cp android/app/src/main/kotlin/com/example/smartersproflutter/MainActivity.kt /tmp/MainActivity.kt
-
-        # 2. حذف البنية المكسورة
-        rm -rf android
-
-        # 3. إنشاء بنية أندرويد جديدة ونظيفة (سيستخدم الباقة الافتراضية com.example.iptv_flutter)
-        flutter create . --template=app --platform=android --org com.example --project-name iptv_flutter
-        
-        # 4. إصلاح اسم الباقة والـ namespace في الملفات التي أنشأها Flutter (الأمر الحاسم)
-        # هذا يضمن أن اسم الباقة يطابق com.example.smartersproflutter كما في ملفاتك
-        sed -i 's/com.example.iptv_flutter/com.example.smartersproflutter/g' android/app/build.gradle
-        sed -i 's/com.example.iptv_flutter/com.example.smartersproflutter/g' android/app/src/main/AndroidManifest.xml
-        
-        # 5. استبدال الملفات الجديدة بملفاتنا المعدلة (معالجة V2 Embedding)
-        cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
-        cp /tmp/app_build.gradle android/app/build.gradle
-        cp /tmp/project_build.gradle android/build.gradle
-        
-        # 6. استعادة ملف Kotlin: هذا المسار الآن يجب أن يكون صحيحاً تماماً.
-        mkdir -p android/app/src/main/kotlin/com/example/smartersproflutter
-        cp /tmp/MainActivity.kt android/app/src/main/kotlin/com/example/smartersproflutter/MainActivity.kt
-        
-        # 7. تنظيف ملف settings.gradle
-        echo "include ':app'" > android/settings.gradle
+    # === إزالة خطوة 5 (إعادة البناء) لأنها تسبب مشاكل ===
     
-    # هذه الخطوة مهمة جداً لـ IPTV: تسمح باتصالات HTTP غير المشفرة (Cleartext Traffic)
+    # 5. Fix Android Build System (Temporary Fix for broken setup)
+    # هذا يضمن وجود مجلدات build/app/outputs
+    - name: 5. Prepare Android Environment
+      run: |
+        # التأكد من صلاحية ملف settings.gradle لربط المكتبات
+        echo "include ':app'" > android/settings.gradle
+        
+        # التأكد من وجود ملف local.properties الذي يطلبه Gradle
+        echo "flutter.sdk=$(echo $FLUTTER_ROOT)" > android/local.properties
+    
+    # 6. Apply AndroidManifest Patch (Cleartext Traffic)
     - name: 6. Apply AndroidManifest Patch (Cleartext Traffic)
       run: |
         MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
@@ -70,7 +50,8 @@ jobs:
         fi
         
     - name: 7. Build Android APK (Release)
-      run: flutter build apk --release
+      # نستخدم خيار --no-build-cleanup لمنع الخادم من حذف الملفات الهامة
+      run: flutter build apk --release --no-build-cleanup
 
     - name: 8. Upload APK Artifact
       uses: actions/upload-artifact@v4
@@ -79,7 +60,7 @@ jobs:
         path: build/app/outputs/flutter/apk/app-release.apk
         
     - name: 9. Build Android AAB (App Bundle for Play Store)
-      run: flutter build appbundle --release
+      run: flutter build appbundle --release --no-build-cleanup
 
     - name: 10. Upload AAB Artifact
       uses: actions/upload-artifact@v4
