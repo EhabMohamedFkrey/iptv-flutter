@@ -28,8 +28,12 @@ jobs:
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # 5. Prepare Android Environment (التهيئة النهائية)
-    - name: 5. Prepare Android Environment
+    # === الخطوة الجديدة: منح صلاحيات التنفيذ لـ gradlew ===
+    - name: 5. Grant Execution Permissions to gradlew
+      run: chmod +x android/gradlew
+    
+    # 6. Prepare Android Environment (التهيئة النهائية)
+    - name: 6. Prepare Android Environment
       run: |
         # التأكد من صلاحية ملف settings.gradle لربط المكتبات
         echo "include ':app'" > android/settings.gradle
@@ -37,8 +41,8 @@ jobs:
         # التأكد من وجود ملف local.properties الذي يطلبه Gradle
         echo "flutter.sdk=$(echo $FLUTTER_ROOT)" > android/local.properties
     
-    # 6. Apply AndroidManifest Patch (Cleartext Traffic)
-    - name: 6. Apply AndroidManifest Patch (Cleartext Traffic)
+    # 7. Apply AndroidManifest Patch (Cleartext Traffic)
+    - name: 7. Apply AndroidManifest Patch (Cleartext Traffic)
       run: |
         MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
         # التأكد من إضافة android:usesCleartextTraffic="true" إلى وسم <application>
@@ -46,20 +50,19 @@ jobs:
             sed -i '/<application/ s/.$/ android:usesCleartextTraffic="true"&/' "$MANIFEST_FILE"
         fi
         
-    - name: 7. Build Android APK (Release)
-      # الرجوع إلى الأمر البسيط والموثوق
+    - name: 8. Build Android APK (Release)
       run: flutter build apk --release
 
-    - name: 8. Upload APK Artifact
+    - name: 9. Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: release-apk
         path: build/app/outputs/flutter/apk/app-release.apk
         
-    - name: 9. Build Android AAB (App Bundle for Play Store)
+    - name: 10. Build Android AAB (App Bundle for Play Store)
       run: flutter build appbundle --release
 
-    - name: 10. Upload AAB Artifact
+    - name: 11. Upload AAB Artifact
       uses: actions/upload-artifact@v4
       with:
         name: release-aab
