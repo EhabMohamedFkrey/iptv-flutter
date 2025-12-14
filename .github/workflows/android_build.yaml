@@ -40,20 +40,24 @@ jobs:
         # 2. حذف البنية المكسورة
         rm -rf android
 
-        # 3. إنشاء بنية أندرويد جديدة ونظيفة باستخدام اسم الباقة الذي تتوقعه ملفاتنا!
-        flutter create . --template=app --platform=android --org com.example --project-name iptv_flutter --package com.example.smartersproflutter
+        # 3. إنشاء بنية أندرويد جديدة ونظيفة (سيستخدم الباقة الافتراضية com.example.iptv_flutter)
+        flutter create . --template=app --platform=android --org com.example --project-name iptv_flutter
         
-        # 4. استبدال الملفات الجديدة بملفاتنا المعدلة (معالجة V2 Embedding)
-        # نستخدم الملفات المؤقتة التي تحتوي على إعدادات V2 و MultiDex
+        # 4. إصلاح اسم الباقة والـ namespace في الملفات التي أنشأها Flutter (الأمر الحاسم)
+        # هذا يضمن أن اسم الباقة يطابق com.example.smartersproflutter كما في ملفاتك
+        sed -i 's/com.example.iptv_flutter/com.example.smartersproflutter/g' android/app/build.gradle
+        sed -i 's/com.example.iptv_flutter/com.example.smartersproflutter/g' android/app/src/main/AndroidManifest.xml
+        
+        # 5. استبدال الملفات الجديدة بملفاتنا المعدلة (معالجة V2 Embedding)
         cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
         cp /tmp/app_build.gradle android/app/build.gradle
         cp /tmp/project_build.gradle android/build.gradle
         
-        # 5. استعادة ملف Kotlin: هذا المسار الآن يجب أن يكون صحيحاً تماماً.
+        # 6. استعادة ملف Kotlin: هذا المسار الآن يجب أن يكون صحيحاً تماماً.
         mkdir -p android/app/src/main/kotlin/com/example/smartersproflutter
         cp /tmp/MainActivity.kt android/app/src/main/kotlin/com/example/smartersproflutter/MainActivity.kt
         
-        # 6. تنظيف ملف settings.gradle الذي أنشأه flutter create
+        # 7. تنظيف ملف settings.gradle
         echo "include ':app'" > android/settings.gradle
     
     # هذه الخطوة مهمة جداً لـ IPTV: تسمح باتصالات HTTP غير المشفرة (Cleartext Traffic)
