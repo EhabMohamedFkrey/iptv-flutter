@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - master
-  workflow_dispatch: # يسمح بتشغيل البناء يدوياً من واجهة GitHub
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,25 +13,48 @@ jobs:
     
     steps:
     - name: 1. Checkout Repository
-      uses: actions/checkout@v4 # تحديث إلى v4
+      uses: actions/checkout@v4
 
     - name: 2. Setup Flutter SDK
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.16.0' # استخدام إصدار ثابت وموثوق
+        flutter-version: '3.16.0'
         channel: 'stable'
 
     - name: 3. Install Dependencies
       run: flutter pub get
 
-    # توليد ملفات models.g.dart الضرورية للتطبيق
+    # توليد ملفات models.g.dart
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # === تم حذف الخطوة رقم 5 المكسورة (media_kit:setup) التي تسببت في الخطأ ===
+    # === الخطوة الحـاسمة: إعادة بناء هيكل الأندرويد بالكامل ===
+    - name: 5. Rebuild and Patch Android Structure
+      run: |
+        # 1. نسخ ملفاتنا المخصصة جانباً
+        cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml
+        cp android/app/build.gradle /tmp/app_build.gradle
+        cp android/build.gradle /tmp/project_build.gradle
+        cp android/app/src/main/kotlin/com/example/smartersproflutter/MainActivity.kt /tmp/MainActivity.kt
 
+        # 2. حذف البنية المكسورة
+        rm -rf android
+
+        # 3. إنشاء بنية أندرويد جديدة ونظيفة
+        flutter create . --template=app --platform=android
+
+        # 4. استبدال الملفات الجديدة بملفاتنا المعدلة (معالجة V2 Embedding)
+        cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+        cp /tmp/app_build.gradle android/app/build.gradle
+        cp /tmp/project_build.gradle android/build.gradle
+        mkdir -p android/app/src/main/kotlin/com/example/smartersproflutter # إعادة إنشاء المسار
+        cp /tmp/MainActivity.kt android/app/src/main/kotlin/com/example/smartersproflutter/MainActivity.kt
+        
+        # 5. تنظيف ملف settings.gradle الذي أنشأه flutter create (لإزالة أي مسارات غير ضرورية)
+        echo "include ':app'" > android/settings.gradle
+    
     # هذه الخطوة مهمة جداً لـ IPTV: تسمح باتصالات HTTP غير المشفرة (Cleartext Traffic)
-    - name: 5. Apply AndroidManifest Patch (Cleartext Traffic)
+    - name: 6. Apply AndroidManifest Patch (Cleartext Traffic)
       run: |
         MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
         # التأكد من إضافة android:usesCleartextTraffic="true" إلى وسم <application>
@@ -39,19 +62,19 @@ jobs:
             sed -i '/<application/ s/.$/ android:usesCleartextTraffic="true"&/' "$MANIFEST_FILE"
         fi
         
-    - name: 6. Build Android APK (Release)
+    - name: 7. Build Android APK (Release)
       run: flutter build apk --release
 
-    - name: 7. Upload APK Artifact
+    - name: 8. Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: release-apk
         path: build/app/outputs/flutter/apk/app-release.apk
         
-    - name: 8. Build Android AAB (App Bundle for Play Store)
+    - name: 9. Build Android AAB (App Bundle for Play Store)
       run: flutter build appbundle --release
 
-    - name: 9. Upload AAB Artifact
+    - name: 10. Upload AAB Artifact
       uses: actions/upload-artifact@v4
       with:
         name: release-aab
