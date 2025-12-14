@@ -16,3 +16,17 @@ pluginManagement {
 }
 
 include ':app'
+
+// هذا الجزء يضمن ربط مكتبات الطرف الثالث بشكل صحيح
+def flutterProjectRoot = settingsDir.parentFile
+def plugins = new Properties()
+def pluginsFile = new File(flutterProjectRoot, '.flutter-plugins')
+if (pluginsFile.exists()) {
+    pluginsFile.withReader('UTF-8') { reader -> plugins.load(reader) }
+}
+
+plugins.each { name, path ->
+    def pluginDirectory = flutterProjectRoot.resolve(path)
+    include ":$name"
+    project(":$name").projectDir = pluginDirectory
+}
