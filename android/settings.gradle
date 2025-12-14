@@ -1,0 +1,18 @@
+pluginManagement {
+    def flutterSdkPath = "$settingsDir/local.properties"
+    if (new File(flutterSdkPath).exists()) {
+        Properties flutterProperties = new Properties()
+        flutterProperties.load(new FileInputStream(flutterSdkPath))
+        if (flutterProperties.containsKey("flutter.sdk")) {
+            settings.ext.flutterSdkPath = flutterProperties.getProperty("flutter.sdk")
+        }
+    }
+    
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+include ':app'
