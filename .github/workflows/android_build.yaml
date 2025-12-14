@@ -40,17 +40,21 @@ jobs:
         # 2. حذف البنية المكسورة
         rm -rf android
 
-        # 3. إنشاء بنية أندرويد جديدة ونظيفة
-        flutter create . --template=app --platform=android
+        # 3. إنشاء بنية أندرويد جديدة ونظيفة باستخدام اسم مشروع Dart الجديد (iptv_flutter)
+        # هذا يحل مشكلة "unsupported Gradle project"
+        flutter create . --template=app --platform=android --org com.example --project-name iptv_flutter
 
         # 4. استبدال الملفات الجديدة بملفاتنا المعدلة (معالجة V2 Embedding)
+        # نستخدم الملفات المؤقتة التي تحتوي على إعدادات V2 و MultiDex
         cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
         cp /tmp/app_build.gradle android/app/build.gradle
         cp /tmp/project_build.gradle android/build.gradle
-        mkdir -p android/app/src/main/kotlin/com/example/smartersproflutter # إعادة إنشاء المسار
+        
+        # 5. استعادة مسار ملف Kotlin الخاص بنا
+        mkdir -p android/app/src/main/kotlin/com/example/smartersproflutter
         cp /tmp/MainActivity.kt android/app/src/main/kotlin/com/example/smartersproflutter/MainActivity.kt
         
-        # 5. تنظيف ملف settings.gradle الذي أنشأه flutter create (لإزالة أي مسارات غير ضرورية)
+        # 6. تنظيف ملف settings.gradle الذي أنشأه flutter create (لإزالة أي مسارات غير ضرورية)
         echo "include ':app'" > android/settings.gradle
     
     # هذه الخطوة مهمة جداً لـ IPTV: تسمح باتصالات HTTP غير المشفرة (Cleartext Traffic)
