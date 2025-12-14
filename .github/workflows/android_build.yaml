@@ -1,0 +1,60 @@
+name: Flutter Android Build (APK & AAB)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 1. Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: 2. Setup Flutter SDK
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0' # Stable Flutter version
+        channel: 'stable'
+
+    - name: 3. Install Dependencies
+      run: flutter pub get
+
+    # Generation of models.g.dart (Crucial for JSON serialization)
+    - name: 4. Generate Models (build_runner)
+      run: flutter packages pub run build_runner build --delete-conflicting-outputs
+    
+    # Pre-compilation for media_kit (Crucial for the advanced player libraries)
+    - name: 5. Setup media_kit libraries
+      run: flutter pub run media_kit_libs_video:setup
+
+    # This step is VITAL for IPTV support: allowing cleartext HTTP traffic
+    - name: 6. Apply AndroidManifest Patch (Cleartext Traffic)
+      run: |
+        MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
+        # Ensure that android:usesCleartextTraffic="true" is added
+        if ! grep -q 'android:usesCleartextTraffic="true"' "$MANIFEST_FILE"; then
+            sed -i '/<application/ s/.$/ android:usesCleartextTraffic="true"&/' "$MANIFEST_FILE"
+        fi
+        
+    - name: 7. Build Android APK (Release)
+      run: flutter build apk --release
+
+    - name: 8. Upload APK Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-apk
+        path: build/app/outputs/flutter/apk/app-release.apk
+        
+    - name: 9. Build Android AAB (App Bundle for Play Store)
+      run: flutter build appbundle --release
+
+    - name: 10. Upload AAB Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-aab
+        path: build/app/outputs/bundle/release/app-release.aab
