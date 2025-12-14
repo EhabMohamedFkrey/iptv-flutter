@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - master
-  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+  workflow_dispatch: # يسمح بتشغيل البناء يدوياً من واجهة GitHub
 
 jobs:
   build:
@@ -13,47 +13,45 @@ jobs:
     
     steps:
     - name: 1. Checkout Repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4 # تحديث إلى v4
 
     - name: 2. Setup Flutter SDK
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.16.0' # Stable Flutter version
+        flutter-version: '3.16.0' # استخدام إصدار ثابت وموثوق
         channel: 'stable'
 
     - name: 3. Install Dependencies
       run: flutter pub get
 
-    # Generation of models.g.dart (Crucial for JSON serialization)
+    # توليد ملفات models.g.dart الضرورية للتطبيق
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # Pre-compilation for media_kit (Crucial for the advanced player libraries)
-    - name: 5. Setup media_kit libraries
-      run: flutter pub run media_kit_libs_video:setup
+    # === تم حذف الخطوة رقم 5 المكسورة (media_kit:setup) التي تسببت في الخطأ ===
 
-    # This step is VITAL for IPTV support: allowing cleartext HTTP traffic
-    - name: 6. Apply AndroidManifest Patch (Cleartext Traffic)
+    # هذه الخطوة مهمة جداً لـ IPTV: تسمح باتصالات HTTP غير المشفرة (Cleartext Traffic)
+    - name: 5. Apply AndroidManifest Patch (Cleartext Traffic)
       run: |
         MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
-        # Ensure that android:usesCleartextTraffic="true" is added
+        # التأكد من إضافة android:usesCleartextTraffic="true" إلى وسم <application>
         if ! grep -q 'android:usesCleartextTraffic="true"' "$MANIFEST_FILE"; then
             sed -i '/<application/ s/.$/ android:usesCleartextTraffic="true"&/' "$MANIFEST_FILE"
         fi
         
-    - name: 7. Build Android APK (Release)
+    - name: 6. Build Android APK (Release)
       run: flutter build apk --release
 
-    - name: 8. Upload APK Artifact
+    - name: 7. Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: release-apk
         path: build/app/outputs/flutter/apk/app-release.apk
         
-    - name: 9. Build Android AAB (App Bundle for Play Store)
+    - name: 8. Build Android AAB (App Bundle for Play Store)
       run: flutter build appbundle --release
 
-    - name: 10. Upload AAB Artifact
+    - name: 9. Upload AAB Artifact
       uses: actions/upload-artifact@v4
       with:
         name: release-aab
