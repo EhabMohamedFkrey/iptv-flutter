@@ -18,7 +18,7 @@ jobs:
     - name: 2. Setup Flutter SDK
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.24.3' # استخدام إصدار حديث
+        flutter-version: '3.24.3'
         channel: 'stable'
 
     - name: 3. Install Dependencies
@@ -27,8 +27,8 @@ jobs:
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # === الخطوة الذكية: إنشاء الهيكل + حقن التوافق ===
-    - name: 5. Nuke and Regenerate Android
+    # === الخطوة الذكية: إنشاء الهيكل + استبدال ملف البناء الجذري ===
+    - name: 5. Nuke and Regenerate Android with Forced Versions
       run: |
         # 1. حذف المجلد القديم
         rm -rf android
@@ -36,19 +36,50 @@ jobs:
         # 2. إنشاء هيكل سليم تلقائياً
         flutter create . --platform android --project-name iptv_flutter --org com.example
 
-        # 3. كتابة ملف local.properties بشكل صريح (مهم جداً للمكتبات)
+        # 3. كتابة ملف local.properties
         echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
 
-        # 4. === الحل السحري لمشكلة package_info_plus ===
-        # نضيف كوداً في build.gradle يجبر كل المكتبات على استخدام إصدار SDK 34
-        cat <<EOF >> android/build.gradle
-        
-        // هذا الكود يجبر جميع المكتبات على استخدام الإصدارات الحديثة
+        # 4. استبدال ملف build.gradle الجذري بالكامل
+        # هذا يضع كود "إجبار الإصدارات" في مكانه الصحيح لتجنب خطأ already evaluated
+        cat <<EOF > android/build.gradle
+        buildscript {
+            ext.kotlin_version = '1.9.0'
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:8.0.0'
+                classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:\$kotlin_version"
+            }
+        }
+
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+
+        rootProject.buildDir = '../build'
+        subprojects {
+            project.buildDir = "\${rootProject.buildDir}/\${project.name}"
+        }
+        subprojects {
+            project.evaluationDependsOn(':app')
+        }
+
+        tasks.register("clean", Delete) {
+            delete rootProject.buildDir
+        }
+
+        // الإصلاح المضمون: إجبار جميع المكتبات على استخدام SDK 34
         subprojects {
             afterEvaluate { project ->
                 if (project.hasProperty("android")) {
                     android {
                         compileSdkVersion 34
+                        namespace = project.group + "." + project.name.replace("-", "_") 
                         defaultConfig {
                             minSdkVersion 21
                             targetSdkVersion 34
@@ -78,7 +109,7 @@ jobs:
         class MainActivity: FlutterActivity()
         EOF
         
-        # حذف الملف الخاطئ الذي أنشأه flutter create
+        # حذف الملف الخاطئ
         rm -rf android/app/src/main/kotlin/com/example/iptv_flutter
     
     - name: 6. Build Android APK (Release)
