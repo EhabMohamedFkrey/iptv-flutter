@@ -28,25 +28,28 @@ jobs:
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # === الخطوة السحرية: حذف المجلد اليدوي وتوليده آلياً ===
+    # === الخطوة الذكية: إعادة البناء والإضافة الآمنة للإعدادات ===
     - name: 5. Nuke and Regenerate Android
       run: |
-        # 1. حذف مجلد android القديم/المكسور بالكامل
+        # 1. حذف مجلد android القديم
         rm -rf android
 
-        # 2. إنشاء بنية أندرويد جديدة ونظيفة (متوافقة مع pubspec.yaml)
-        # نستخدم اسم المشروع الموجود في pubspec.yaml
-        flutter create . --project-name smarters_pro_flutter --org com.example --platform android
+        # 2. إنشاء بنية أندرويد جديدة (يقرأ الاسم تلقائياً من pubspec.yaml)
+        flutter create . --platform android
 
-        # 3. تعديل ملفات Gradle تلقائياً لدعم media_kit (MultiDex & MinSDK)
-        # رفع الحد الأدنى لإصدار الأندرويد إلى 21
+        # 3. رفع الحد الأدنى لإصدار الأندرويد (MinSDK)
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
-        # تفعيل MultiDex
+        
+        # 4. تفعيل MultiDex داخل defaultConfig
         sed -i '/defaultConfig {/a \ \ \ \ \ \ \ \ multiDexEnabled true' android/app/build.gradle
-        sed -i '/dependencies {/a \ \ \ \ implementation "androidx.multidex:multidex:2.0.1"' android/app/build.gradle
+        
+        # 5. إضافة مكتبة MultiDex بطريقة آمنة (في نهاية الملف لتجنب أخطاء Syntax)
+        echo "" >> android/app/build.gradle
+        echo "dependencies {" >> android/app/build.gradle
+        echo "    implementation 'androidx.multidex:multidex:2.0.1'" >> android/app/build.gradle
+        echo "}" >> android/app/build.gradle
 
-        # 4. إضافة صلاحيات IPTV (Cleartext) إلى ملف Manifest الجديد
-        # نضيف السطر داخل وسم <application>
+        # 6. إضافة صلاحيات IPTV (Cleartext) إلى ملف Manifest
         sed -i '/<application/a \ \ \ \ \ \ \ \ android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
     
     - name: 6. Build Android APK (Release)
