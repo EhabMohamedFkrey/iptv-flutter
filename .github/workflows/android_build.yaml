@@ -27,82 +27,46 @@ jobs:
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # === الخطوة الذهبية: الترتيب الصحيح + توحيد الأسماء ===
-    - name: 5. Standardize & Regenerate Android with Fixes
+    # === الخطوة الذهبية: البناء التلقائي + التعديل الذكي (بدون استبدال) ===
+    - name: 5. Standardize & Configure Android Safely
       run: |
-        # 1. تصحيح اسم المشروع في pubspec.yaml
+        # 1. توحيد الأسماء في pubspec وملفات الكود
         sed -i 's/name: .*/name: iptv_flutter/' pubspec.yaml
-
-        # 2. تصحيح الاستدعاءات (Imports) في ملفات Dart لتستخدم الاسم الجديد
         find lib -name "*.dart" -print0 | xargs -0 sed -i 's/package:smarters_pro_flutter/package:iptv_flutter/g'
 
-        # 3. حذف مجلد android القديم
+        # 2. حذف Android القديم وإنشاء الجديد
         rm -rf android
-
-        # 4. إنشاء بنية أندرويد جديدة ونظيفة
         flutter create . --platform android --project-name iptv_flutter --org com.example
 
-        # 5. كتابة ملف local.properties
+        # 3. كتابة local.properties (مهم جداً)
         echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
 
-        # 6. === استبدال ملف build.gradle الجذري (بالترتيب الصحيح) ===
-        # هذا الملف يجبر المكتبات على SDK 34 قبل أن يبدأ التقييم
-        cat <<EOF > android/build.gradle
-        buildscript {
-            ext.kotlin_version = '1.9.0'
-            repositories {
-                google()
-                mavenCentral()
-            }
-            dependencies {
-                classpath 'com.android.tools.build:gradle:8.0.2'
-                classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:\$kotlin_version"
-            }
-        }
+        # 4. === الحقن الذكي في android/build.gradle ===
+        # بدلاً من استبدال الملف، نحقن كود الإصلاح بعد سطر 'rootProject.buildDir'
+        # هذا يضمن وجود الكود قبل 'evaluationDependsOn' الموجود في نهاية الملف الأصلي
+        sed -i "/rootProject.buildDir = '..\/build'/a \\
+        subprojects {\\
+            afterEvaluate { project ->\\
+                if (project.hasProperty('android')) {\\
+                    android {\\
+                        compileSdkVersion 34\\
+                        defaultConfig {\\
+                            minSdkVersion 21\\
+                            targetSdkVersion 34\\
+                        }\\
+                        if (namespace == null) {\\
+                            namespace = project.group + '.' + project.name.replace('-', '_')\\
+                        }\\
+                    }\\
+                }\\
+            }\\
+        }" android/build.gradle
 
-        allprojects {
-            repositories {
-                google()
-                mavenCentral()
-            }
-        }
-
-        rootProject.buildDir = '../build'
-        subprojects {
-            project.buildDir = "\${rootProject.buildDir}/\${project.name}"
-        }
-
-        // === الإصلاح: إجبار الإعدادات (يجب أن يكون قبل evaluationDependsOn) ===
-        subprojects {
-            afterEvaluate { project ->
-                if (project.hasProperty("android")) {
-                    android {
-                        compileSdkVersion 34
-                        if (namespace == null) {
-                            namespace = project.group + "." + project.name.replace("-", "_")
-                        }
-                        defaultConfig {
-                            minSdkVersion 21
-                            targetSdkVersion 34
-                        }
-                    }
-                }
-            }
-        }
-
-        // هذا السطر يأتي في النهاية
-        subprojects {
-            project.evaluationDependsOn(':app')
-        }
-
-        tasks.register("clean", Delete) {
-            delete rootProject.buildDir
-        }
-        EOF
-
-        # 7. تعديل ملف app/build.gradle (MultiDex & Package Name)
+        # 5. تعديلات android/app/build.gradle
+        # تفعيل MultiDex
         sed -i '/defaultConfig {/a \ \ \ \ \ \ \ \ multiDexEnabled true' android/app/build.gradle
-        # إضافة المكتبة
+        
+        # إضافة تبعية MultiDex بشكل آمن في النهاية
         echo "" >> android/app/build.gradle
         echo "dependencies {" >> android/app/build.gradle
         echo "    implementation 'androidx.multidex:multidex:2.0.1'" >> android/app/build.gradle
@@ -111,10 +75,10 @@ jobs:
         # تصحيح اسم الباقة ليطابق ملفات الكود
         sed -i 's/com.example.iptv_flutter/com.example.smartersproflutter/g' android/app/build.gradle
 
-        # 8. تعديل Manifest (IPTV)
+        # 6. تعديل Manifest
         sed -i '/<application/a \ \ \ \ \ \ \ \ android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
         
-        # 9. استعادة ملف Kotlin
+        # 7. استعادة ملف Kotlin
         mkdir -p android/app/src/main/kotlin/com/example/smartersproflutter
         cat <<EOF > android/app/src/main/kotlin/com/example/smartersproflutter/MainActivity.kt
         package com.example.smartersproflutter
@@ -122,7 +86,7 @@ jobs:
         class MainActivity: FlutterActivity()
         EOF
         
-        # حذف الملف الخاطئ
+        # حذف الملف الافتراضي الخاطئ
         rm -rf android/app/src/main/kotlin/com/example/iptv_flutter
     
     - name: 6. Build Android APK (Release)
