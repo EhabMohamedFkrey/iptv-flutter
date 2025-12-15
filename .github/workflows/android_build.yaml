@@ -27,35 +27,52 @@ jobs:
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # === الخطوة الذهبية: البناء الحديث + تعريف الخصائص المفقودة ===
-    - name: 5. Regenerate Android & Inject Properties
+    # === الخطوة الذهبية: الترتيب الصحيح للأوامر في Gradle ===
+    - name: 5. Regenerate Android with Correct Order
       run: |
-        # 1. توحيد الاسم في pubspec (ضروري جداً)
+        # 1. توحيد الاسم في pubspec
         sed -i 's/name: .*/name: iptv_flutter/' pubspec.yaml
-        # تصحيح الـ imports
         find lib -name "*.dart" -print0 | xargs -0 sed -i 's/package:smarters_pro_flutter/package:iptv_flutter/g'
 
-        # 2. حذف Android القديم
+        # 2. حذف Android القديم وإنشاء الجديد
         rm -rf android
-
-        # 3. إنشاء هيكل حديث (Modern Gradle)
         flutter create . --platform android --project-name iptv_flutter --org com.example
 
-        # 4. === الحل السحري: ملء local.properties بالقيم التي تطلبها المكتبات ===
-        # هذا يحل مشكلة package_info_plus ومشكلة compileSdkVersion المفقودة
+        # 3. ملء local.properties بالقيم الهامة
         echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
         echo "flutter.buildMode=release" >> android/local.properties
         echo "flutter.versionName=1.0.0" >> android/local.properties
         echo "flutter.versionCode=1" >> android/local.properties
-        echo "flutter.compileSdkVersion=34" >> android/local.properties
-        echo "flutter.minSdkVersion=21" >> android/local.properties
-        echo "flutter.targetSdkVersion=34" >> android/local.properties
 
-        # 5. حقن كود إجبار الإصدارات في جذر build.gradle (للتأكيد فقط)
-        # نضعه في النهاية ليعمل بعد تحميل الإضافات
-        cat <<EOF >> android/build.gradle
-        
-        // Force versions for all subprojects (plugins)
+        # 4. === استبدال ملف build.gradle الجذري بالكامل ===
+        # السبب: لضمان أن كود الإصلاح يأتي قبل evaluationDependsOn
+        cat <<EOF > android/build.gradle
+        buildscript {
+            ext.kotlin_version = '1.9.0'
+            repositories {
+                google()
+                mavenCentral()
+            }
+            dependencies {
+                classpath 'com.android.tools.build:gradle:8.0.2'
+                classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:\$kotlin_version"
+            }
+        }
+
+        allprojects {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
+
+        rootProject.buildDir = '../build'
+        subprojects {
+            project.buildDir = "\${rootProject.buildDir}/\${project.name}"
+        }
+
+        // === الترتيب الصحيح: الإصلاح هنا ===
+        // إجبار جميع المكتبات (مثل package_info_plus) على استخدام SDK 34
         subprojects {
             afterEvaluate { project ->
                 if (project.hasProperty("android")) {
@@ -69,21 +86,32 @@ jobs:
                 }
             }
         }
+
+        // === الترتيب الصحيح: التقييم هنا (يجب أن يكون الأخير) ===
+        subprojects {
+            project.evaluationDependsOn(':app')
+        }
+
+        tasks.register("clean", Delete) {
+            delete rootProject.buildDir
+        }
         EOF
 
-        # 6. تعديل app/build.gradle (MultiDex & Namespace)
-        # تفعيل MultiDex
+        # 5. تعديل app/build.gradle (MultiDex & Namespace)
         sed -i '/defaultConfig {/a \ \ \ \ \ \ \ \ multiDexEnabled true' android/app/build.gradle
-        # إضافة المكتبة
-        sed -i '/dependencies {/a \ \ \ \ implementation "androidx.multidex:multidex:2.0.1"' android/app/build.gradle
+        # إضافة المكتبة بأمان
+        echo "" >> android/app/build.gradle
+        echo "dependencies {" >> android/app/build.gradle
+        echo "    implementation 'androidx.multidex:multidex:2.0.1'" >> android/app/build.gradle
+        echo "}" >> android/app/build.gradle
         
-        # تصحيح اسم الباقة ليطابق ملفات الكود التي سنستعيدها
+        # تصحيح اسم الباقة
         sed -i 's/com.example.iptv_flutter/com.example.smartersproflutter/g' android/app/build.gradle
 
-        # 7. تعديل Manifest
+        # 6. تعديل Manifest
         sed -i '/<application/a \ \ \ \ \ \ \ \ android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
         
-        # 8. استعادة ملف Kotlin
+        # 7. استعادة ملف Kotlin
         mkdir -p android/app/src/main/kotlin/com/example/smartersproflutter
         cat <<EOF > android/app/src/main/kotlin/com/example/smartersproflutter/MainActivity.kt
         package com.example.smartersproflutter
