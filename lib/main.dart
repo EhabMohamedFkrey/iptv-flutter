@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:smarters_pro_flutter/models/models.dart';
-import 'package:smarters_pro_flutter/services/api_service.dart';
-import 'package:smarters_pro_flutter/screens/player_screen.dart';
+// تم تعديل الاستدعاءات هنا لتطابق اسم الباقة الجديد
+import 'package:iptv_flutter/models/models.dart';
+import 'package:iptv_flutter/services/api_service.dart';
+import 'package:iptv_flutter/screens/player_screen.dart';
 
 // Initialize the media player and run the app
 void main() {
@@ -13,9 +14,8 @@ void main() {
   runApp(const ProviderScope(child: SmartersProApp()));
 }
 
-// -----------------------------------------------------------------
-// App Theme and Configuration
-// -----------------------------------------------------------------
+// ... (باقي الكود كما هو تماماً، فقط تأكد من تعديل الـ imports في البداية)
+// سأضع لك الكود كاملاً للتأكد
 class SmartersProApp extends StatelessWidget {
   const SmartersProApp({super.key});
 
@@ -37,8 +37,8 @@ class SmartersProApp extends StatelessWidget {
           titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         colorScheme: ColorScheme.fromSwatch().copyWith(
-          primary: const Color(0xFF7158E2), // Purple Accent
-          secondary: const Color(0xFF0097E6), // Blue Accent
+          primary: const Color(0xFF7158E2),
+          secondary: const Color(0xFF0097E6),
           background: const Color(0xFF0F0518),
         ),
         useMaterial3: true,
@@ -47,10 +47,6 @@ class SmartersProApp extends StatelessWidget {
     );
   }
 }
-
-// -----------------------------------------------------------------
-// Authentication Logic (Riverpod)
-// -----------------------------------------------------------------
 
 final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
 
@@ -84,9 +80,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<Credentials?>> {
   }
 }
 
-// -----------------------------------------------------------------
-// Login Gate (Check Auth State)
-// -----------------------------------------------------------------
 class LoginGate extends ConsumerWidget {
   const LoginGate({super.key});
 
@@ -108,10 +101,6 @@ class LoginGate extends ConsumerWidget {
     );
   }
 }
-
-// -----------------------------------------------------------------
-// Login Screen (UI)
-// -----------------------------------------------------------------
 
 class LoginScreen extends ConsumerWidget {
   final String? error;
@@ -138,7 +127,7 @@ class LoginScreen extends ConsumerWidget {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(32.0),
             child: Directionality(
-              textDirection: TextDirection.rtl, // Set RTL for Arabic text and icons alignment
+              textDirection: TextDirection.rtl,
               child: Container(
                 padding: const EdgeInsets.all(24.0),
                 decoration: BoxDecoration(
@@ -151,26 +140,21 @@ class LoginScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Logo and Title
                     const FaIcon(FontAwesomeIcons.tv, color: Color(0xFF7158E2), size: 80),
                     const Padding(
                       padding: EdgeInsets.only(top: 8.0, bottom: 24.0),
                       child: Text(
                         'IPTV SMARTERS PRO',
                         style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 1.5),
-                        textDirection: TextDirection.ltr, // Keep title LTR
+                        textDirection: TextDirection.ltr,
                       ),
                     ),
-
-                    // Input Fields
                     _buildInput(hostController, 'http://domain.com:port', FontAwesomeIcons.server, isRTL: false),
                     const SizedBox(height: 16),
                     _buildInput(userController, 'اسم المستخدم', FontAwesomeIcons.user, isRTL: true),
                     const SizedBox(height: 16),
                     _buildInput(passController, 'كلمة المرور', FontAwesomeIcons.lock, isRTL: true, isPassword: true),
                     const SizedBox(height: 32),
-
-                    // Login Button
                     ElevatedButton(
                       onPressed: authState.isLoading ? null : () {
                         ref.read(authProvider.notifier).signIn(
@@ -188,8 +172,6 @@ class LoginScreen extends ConsumerWidget {
                           ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                           : const Text('تسجيل الدخول', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                     ),
-                    
-                    // Error Message
                     if (error != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 16.0),
@@ -238,9 +220,6 @@ class LoginScreen extends ConsumerWidget {
   }
 }
 
-// -----------------------------------------------------------------
-// Dashboard Screen
-// -----------------------------------------------------------------
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -275,10 +254,8 @@ class DashboardScreen extends ConsumerWidget {
             children: [
               _buildMainCards(context),
               const SizedBox(height: 20),
-              // يمكنك إضافة اختصارات أخرى هنا
               _buildShortcutCards(context),
               const SizedBox(height: 20),
-              // يتم تحميل هذه القوائم لاحقاً باستخدام API
               _buildHorizontalSection('جديد الأفلام المضافة'),
               _buildHorizontalSection('أحدث المسلسلات'),
             ],
@@ -288,7 +265,6 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
   
-  // Main Category Cards
   Widget _buildMainCards(BuildContext context) {
     return GridView.count(
       shrinkWrap: true,
@@ -311,7 +287,6 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
   
-  // Shortcut Cards
   Widget _buildShortcutCards(BuildContext context) {
     return GridView.count(
       shrinkWrap: true,
@@ -416,10 +391,6 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-// -----------------------------------------------------------------
-// Content/Stream Grid Screens
-// -----------------------------------------------------------------
-
 final categoriesProvider = FutureProvider.family<List<Category>, String>((ref, type) {
   return ref.watch(apiServiceProvider).fetchCategories(type);
 });
@@ -461,7 +432,6 @@ class ContentScreen extends ConsumerWidget {
         textDirection: TextDirection.rtl,
         child: Row(
           children: [
-            // Sidebar
             Container(
               width: 120,
               color: Colors.black.withOpacity(0.4),
@@ -489,8 +459,6 @@ class ContentScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            
-            // Content Grid
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -511,7 +479,6 @@ class ContentScreen extends ConsumerWidget {
                         onTap: () {
                           if (credentials != null) {
                             final url = stream.getStreamUrl(credentials.host, credentials.username, credentials.password);
-                            // Navigate to the advanced player screen
                             Navigator.of(context).push(MaterialPageRoute(
                               builder: (context) => PlayerScreen(url: url, title: stream.name),
                             ));
@@ -546,7 +513,6 @@ class StreamPosterCard extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Poster Image
           ClipRRect(
             borderRadius: BorderRadius.circular(8.0),
             child: Image.network(
@@ -558,8 +524,6 @@ class StreamPosterCard extends StatelessWidget {
               ),
             ),
           ),
-          
-          // Bottom Gradient and Title
           Positioned(
             bottom: 0,
             left: 0,
