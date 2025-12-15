@@ -24,98 +24,48 @@ jobs:
     - name: 3. Install Dependencies
       run: flutter pub get
 
+    # توليد ملفات models.g.dart
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # === الخطوة المصححة: إعادة البناء مع الترتيب الصحيح لملف Gradle ===
-    - name: 5. Nuke and Regenerate Android
+    # === الخطوة الذهبية: توحيد الأسماء وإعادة البناء الآمن ===
+    - name: 5. Standardize Project Name & Regenerate Android
       run: |
-        # 1. حذف المجلد القديم
+        # 1. إجبار اسم المشروع في pubspec.yaml على iptv_flutter
+        # هذا يضمن توافق جميع الأدوات
+        sed -i 's/name: .*/name: iptv_flutter/' pubspec.yaml
+
+        # 2. تصحيح جميع استدعاءات الـ import في ملفات lib/ لتستخدم iptv_flutter
+        # هذا يحل مشكلة Target kernel_snapshot failed
+        find lib -name "*.dart" -print0 | xargs -0 sed -i 's/package:smarters_pro_flutter/package:iptv_flutter/g'
+
+        # 3. حذف مجلد android القديم
         rm -rf android
 
-        # 2. إنشاء هيكل سليم تلقائياً
+        # 4. إنشاء بنية أندرويد جديدة ونظيفة (باسم iptv_flutter)
         flutter create . --platform android --project-name iptv_flutter --org com.example
 
-        # 3. كتابة ملف local.properties
-        echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
-
-        # 4. استبدال ملف build.gradle الجذري (مع الترتيب الصحيح)
-        # نضع كود الإصلاح (subprojects) قبل evaluationDependsOn
-        cat <<EOF > android/build.gradle
-        buildscript {
-            ext.kotlin_version = '1.9.0'
-            repositories {
-                google()
-                mavenCentral()
-            }
-            dependencies {
-                classpath 'com.android.tools.build:gradle:8.0.0'
-                classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:\$kotlin_version"
-            }
-        }
-
-        allprojects {
-            repositories {
-                google()
-                mavenCentral()
-            }
-        }
-
-        rootProject.buildDir = '../build'
-        subprojects {
-            project.buildDir = "\${rootProject.buildDir}/\${project.name}"
-        }
-
-        // === الترتيب الصحيح: هذا الكود يجب أن يكون هنا ===
-        // إجبار جميع المكتبات على استخدام SDK 34
-        subprojects {
-            afterEvaluate { project ->
-                if (project.hasProperty("android")) {
-                    android {
-                        compileSdkVersion 34
-                        if (namespace == null) {
-                            namespace = project.group
-                        }
-                        defaultConfig {
-                            minSdkVersion 21
-                            targetSdkVersion 34
-                        }
-                    }
-                }
-            }
-        }
-
-        // هذا السطر يجب أن يأتي في النهاية
-        subprojects {
-            project.evaluationDependsOn(':app')
-        }
-
-        tasks.register("clean", Delete) {
-            delete rootProject.buildDir
-        }
-        EOF
-
-        # 5. تعديل ملف app/build.gradle لدعم MultiDex واسم الباقة
-        # تفعيل MultiDex
+        # 5. === التعديلات الآمنة على ملفات Gradle (بدون إعادة كتابة كاملة) ===
+        
+        # أ) رفع إصدارات SDK في ملف التطبيق (لحل مشاكل المكتبات)
+        sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/' android/app/build.gradle
+        sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
+        sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/' android/app/build.gradle
+        
+        # ب) تفعيل MultiDex
         sed -i '/defaultConfig {/a \ \ \ \ \ \ \ \ multiDexEnabled true' android/app/build.gradle
-        # إضافة المكتبة
-        sed -i '/dependencies {/a \ \ \ \ implementation "androidx.multidex:multidex:2.0.1"' android/app/build.gradle
-        # تصحيح اسم الباقة ليطابق ملفات الكود (مهم جداً)
-        sed -i 's/com.example.iptv_flutter/com.example.smartersproflutter/g' android/app/build.gradle
+        
+        # ج) إضافة مكتبة MultiDex (في نهاية الملف لتجنب الأخطاء)
+        echo "" >> android/app/build.gradle
+        echo "dependencies {" >> android/app/build.gradle
+        echo "    implementation 'androidx.multidex:multidex:2.0.1'" >> android/app/build.gradle
+        echo "}" >> android/app/build.gradle
 
-        # 6. تعديل Manifest (IPTV Support)
+        # 6. إضافة صلاحيات IPTV (Cleartext) إلى ملف Manifest
         sed -i '/<application/a \ \ \ \ \ \ \ \ android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
         
-        # 7. استعادة ملف MainActivity بالمسار الصحيح
-        mkdir -p android/app/src/main/kotlin/com/example/smartersproflutter
-        cat <<EOF > android/app/src/main/kotlin/com/example/smartersproflutter/MainActivity.kt
-        package com.example.smartersproflutter
-        import io.flutter.embedding.android.FlutterActivity
-        class MainActivity: FlutterActivity()
-        EOF
-        
-        # حذف الملف الخاطئ
-        rm -rf android/app/src/main/kotlin/com/example/iptv_flutter
+        # 7. التأكد من وجود ملف local.properties (احتياطي)
+        echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
     
     - name: 6. Build Android APK (Release)
       run: flutter build apk --release
