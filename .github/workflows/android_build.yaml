@@ -28,14 +28,15 @@ jobs:
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # === الخطوة الذكية: إعادة البناء والإضافة الآمنة للإعدادات ===
+    # === الخطوة الذكية: إعادة البناء مع تصحيح الاسم ===
     - name: 5. Nuke and Regenerate Android
       run: |
         # 1. حذف مجلد android القديم
         rm -rf android
 
-        # 2. إنشاء بنية أندرويد جديدة (يقرأ الاسم تلقائياً من pubspec.yaml)
-        flutter create . --platform android
+        # 2. إنشاء بنية أندرويد جديدة مع إجبار الاسم الصحيح (iptv_flutter)
+        # هذا يحل مشكلة "invalid Dart package name"
+        flutter create . --platform android --project-name iptv_flutter --org com.example
 
         # 3. رفع الحد الأدنى لإصدار الأندرويد (MinSDK)
         sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
@@ -43,7 +44,7 @@ jobs:
         # 4. تفعيل MultiDex داخل defaultConfig
         sed -i '/defaultConfig {/a \ \ \ \ \ \ \ \ multiDexEnabled true' android/app/build.gradle
         
-        # 5. إضافة مكتبة MultiDex بطريقة آمنة (في نهاية الملف لتجنب أخطاء Syntax)
+        # 5. إضافة مكتبة MultiDex بطريقة آمنة (في نهاية الملف)
         echo "" >> android/app/build.gradle
         echo "dependencies {" >> android/app/build.gradle
         echo "    implementation 'androidx.multidex:multidex:2.0.1'" >> android/app/build.gradle
