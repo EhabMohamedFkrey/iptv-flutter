@@ -18,7 +18,7 @@ jobs:
     - name: 2. Setup Flutter SDK
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.16.0'
+        flutter-version: '3.24.3' # تحديث الإصدار لحل مشاكل المكتبات
         channel: 'stable'
 
     - name: 3. Install Dependencies
@@ -35,7 +35,6 @@ jobs:
         rm -rf android
 
         # 2. إنشاء بنية أندرويد جديدة مع إجبار الاسم الصحيح (iptv_flutter)
-        # هذا يحل مشكلة "invalid Dart package name"
         flutter create . --platform android --project-name iptv_flutter --org com.example
 
         # 3. رفع الحد الأدنى لإصدار الأندرويد (MinSDK)
@@ -44,7 +43,7 @@ jobs:
         # 4. تفعيل MultiDex داخل defaultConfig
         sed -i '/defaultConfig {/a \ \ \ \ \ \ \ \ multiDexEnabled true' android/app/build.gradle
         
-        # 5. إضافة مكتبة MultiDex بطريقة آمنة (في نهاية الملف)
+        # 5. إضافة مكتبة MultiDex بطريقة آمنة
         echo "" >> android/app/build.gradle
         echo "dependencies {" >> android/app/build.gradle
         echo "    implementation 'androidx.multidex:multidex:2.0.1'" >> android/app/build.gradle
