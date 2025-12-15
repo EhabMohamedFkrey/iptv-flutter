@@ -27,19 +27,20 @@ jobs:
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # === الخطوة الذكية: الترتيب الصحيح وعدم لمس settings.gradle ===
+    # === الخطوة المصححة: إعادة البناء مع الترتيب الصحيح لملف Gradle ===
     - name: 5. Nuke and Regenerate Android
       run: |
         # 1. حذف المجلد القديم
         rm -rf android
 
-        # 2. إنشاء هيكل سليم (يحتوي على settings.gradle الصحيح)
+        # 2. إنشاء هيكل سليم تلقائياً
         flutter create . --platform android --project-name iptv_flutter --org com.example
 
-        # 3. كتابة local.properties
+        # 3. كتابة ملف local.properties
         echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
 
-        # 4. استبدال build.gradle الجذري (مع تصحيح الترتيب)
+        # 4. استبدال ملف build.gradle الجذري (مع الترتيب الصحيح)
+        # نضع كود الإصلاح (subprojects) قبل evaluationDependsOn
         cat <<EOF > android/build.gradle
         buildscript {
             ext.kotlin_version = '1.9.0'
@@ -65,21 +66,26 @@ jobs:
             project.buildDir = "\${rootProject.buildDir}/\${project.name}"
         }
 
-        // === الترتيب الصحيح: الإصلاح أولاً ===
+        // === الترتيب الصحيح: هذا الكود يجب أن يكون هنا ===
+        // إجبار جميع المكتبات على استخدام SDK 34
         subprojects {
             afterEvaluate { project ->
                 if (project.hasProperty("android")) {
                     android {
                         compileSdkVersion 34
                         if (namespace == null) {
-                            namespace = project.group + "." + project.name.replace("-", "_")
+                            namespace = project.group
+                        }
+                        defaultConfig {
+                            minSdkVersion 21
+                            targetSdkVersion 34
                         }
                     }
                 }
             }
         }
 
-        // ثم الاعتمادية (يأتي في النهاية)
+        // هذا السطر يجب أن يأتي في النهاية
         subprojects {
             project.evaluationDependsOn(':app')
         }
@@ -89,22 +95,18 @@ jobs:
         }
         EOF
 
-        # 5. تعديل ملف app/build.gradle
+        # 5. تعديل ملف app/build.gradle لدعم MultiDex واسم الباقة
         # تفعيل MultiDex
         sed -i '/defaultConfig {/a \ \ \ \ \ \ \ \ multiDexEnabled true' android/app/build.gradle
         # إضافة المكتبة
-        echo "" >> android/app/build.gradle
-        echo "dependencies {" >> android/app/build.gradle
-        echo "    implementation 'androidx.multidex:multidex:2.0.1'" >> android/app/build.gradle
-        echo "}" >> android/app/build.gradle
-        
-        # تصحيح اسم الباقة
+        sed -i '/dependencies {/a \ \ \ \ implementation "androidx.multidex:multidex:2.0.1"' android/app/build.gradle
+        # تصحيح اسم الباقة ليطابق ملفات الكود (مهم جداً)
         sed -i 's/com.example.iptv_flutter/com.example.smartersproflutter/g' android/app/build.gradle
 
-        # 6. تعديل Manifest
+        # 6. تعديل Manifest (IPTV Support)
         sed -i '/<application/a \ \ \ \ \ \ \ \ android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
         
-        # 7. استعادة ملف MainActivity
+        # 7. استعادة ملف MainActivity بالمسار الصحيح
         mkdir -p android/app/src/main/kotlin/com/example/smartersproflutter
         cat <<EOF > android/app/src/main/kotlin/com/example/smartersproflutter/MainActivity.kt
         package com.example.smartersproflutter
