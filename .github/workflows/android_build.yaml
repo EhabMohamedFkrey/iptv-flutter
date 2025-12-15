@@ -28,41 +28,40 @@ jobs:
     - name: 4. Generate Models (build_runner)
       run: flutter packages pub run build_runner build --delete-conflicting-outputs
     
-    # === الخطوة الجديدة: منح صلاحيات التنفيذ لـ gradlew ===
-    - name: 5. Grant Execution Permissions to gradlew
-      run: chmod +x android/gradlew
-    
-    # 6. Prepare Android Environment (التهيئة النهائية)
-    - name: 6. Prepare Android Environment
+    # === الخطوة السحرية: حذف المجلد اليدوي وتوليده آلياً ===
+    - name: 5. Nuke and Regenerate Android
       run: |
-        # التأكد من صلاحية ملف settings.gradle لربط المكتبات
-        echo "include ':app'" > android/settings.gradle
-        
-        # التأكد من وجود ملف local.properties الذي يطلبه Gradle
-        echo "flutter.sdk=$(echo $FLUTTER_ROOT)" > android/local.properties
+        # 1. حذف مجلد android القديم/المكسور بالكامل
+        rm -rf android
+
+        # 2. إنشاء بنية أندرويد جديدة ونظيفة (متوافقة مع pubspec.yaml)
+        # نستخدم اسم المشروع الموجود في pubspec.yaml
+        flutter create . --project-name smarters_pro_flutter --org com.example --platform android
+
+        # 3. تعديل ملفات Gradle تلقائياً لدعم media_kit (MultiDex & MinSDK)
+        # رفع الحد الأدنى لإصدار الأندرويد إلى 21
+        sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' android/app/build.gradle
+        # تفعيل MultiDex
+        sed -i '/defaultConfig {/a \ \ \ \ \ \ \ \ multiDexEnabled true' android/app/build.gradle
+        sed -i '/dependencies {/a \ \ \ \ implementation "androidx.multidex:multidex:2.0.1"' android/app/build.gradle
+
+        # 4. إضافة صلاحيات IPTV (Cleartext) إلى ملف Manifest الجديد
+        # نضيف السطر داخل وسم <application>
+        sed -i '/<application/a \ \ \ \ \ \ \ \ android:usesCleartextTraffic="true"' android/app/src/main/AndroidManifest.xml
     
-    # 7. Apply AndroidManifest Patch (Cleartext Traffic)
-    - name: 7. Apply AndroidManifest Patch (Cleartext Traffic)
-      run: |
-        MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
-        # التأكد من إضافة android:usesCleartextTraffic="true" إلى وسم <application>
-        if ! grep -q 'android:usesCleartextTraffic="true"' "$MANIFEST_FILE"; then
-            sed -i '/<application/ s/.$/ android:usesCleartextTraffic="true"&/' "$MANIFEST_FILE"
-        fi
-        
-    - name: 8. Build Android APK (Release)
+    - name: 6. Build Android APK (Release)
       run: flutter build apk --release
 
-    - name: 9. Upload APK Artifact
+    - name: 7. Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: release-apk
         path: build/app/outputs/flutter/apk/app-release.apk
         
-    - name: 10. Build Android AAB (App Bundle for Play Store)
+    - name: 8. Build Android AAB (App Bundle for Play Store)
       run: flutter build appbundle --release
 
-    - name: 11. Upload AAB Artifact
+    - name: 9. Upload AAB Artifact
       uses: actions/upload-artifact@v4
       with:
         name: release-aab
