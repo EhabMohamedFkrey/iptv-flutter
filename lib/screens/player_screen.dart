@@ -3,7 +3,6 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-// Advanced Player Screen using media_kit for MKV, H265, Subtitles, and Audio Tracks support
 class PlayerScreen extends StatefulWidget {
   final String url;
   final String title;
@@ -19,6 +18,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   late final VideoController controller = VideoController(player);
 
   bool _isControlsVisible = true;
+  bool _isSeeking = false;
+  double _dragValue = 0.0;
   
   // Timer to hide controls
   VoidCallback? _hideControlsDelayed;
@@ -26,10 +27,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
-    // Open and start playback
     player.open(Media(widget.url), play: true);
-    
-    // Initial hide timeout
     _startHideControlsTimer();
   }
 
@@ -40,15 +38,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
   
   void _startHideControlsTimer() {
-    if (_hideControlsDelayed != null) {
-      // Clear previous timeout if exists (not easily done in Flutter, but we override the callback)
-    }
+    _hideControlsDelayed?.call(); // Cancel previous if any (dummy logic)
     _hideControlsDelayed = () {
-      if (mounted) {
+      if (mounted && !_isSeeking) {
         setState(() => _isControlsVisible = false);
       }
     };
-    Future.delayed(const Duration(seconds: 3), _hideControlsDelayed!);
+    Future.delayed(const Duration(seconds: 4), _hideControlsDelayed!);
   }
 
   void _toggleControls() {
@@ -60,20 +56,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes;
+    final seconds = d.inSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Video Display Area
+          // 1. Video Display
           GestureDetector(
             onTap: _toggleControls,
             child: SizedBox.expand(
               child: Video(
                 controller: controller,
-                controls: NoVideoControls, // Use custom controls
-                fit: BoxFit.contain,
+                controls: NoVideoControls,
               ),
             ),
           ),
@@ -87,17 +88,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
               child: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Colors.black54, Colors.transparent, Colors.black54],
+                    colors: [Colors.black87, Colors.transparent, Colors.black87],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                   ),
                 ),
-                child: Column(
-                  children: [
-                    _buildTopControls(),
-                    const Spacer(),
-                    _buildBottomControls(),
-                  ],
+                child: SafeArea(
+                  child: Column(
+                    children: [
+                      _buildTopControls(),
+                      const Spacer(),
+                      _buildBottomControls(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -107,12 +110,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  // Top bar with title and back button
   Widget _buildTopControls() {
     return Padding(
-      padding: const EdgeInsets.only(top: 32.0, left: 16.0, right: 16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
             icon: const FaIcon(FontAwesomeIcons.arrowRight, color: Colors.white),
@@ -121,12 +122,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
           Expanded(
             child: Text(
               widget.title,
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          // Settings button (Audio/Subtitle tracks)
           StreamBuilder<PlayerState>(
             stream: player.stream.state,
             builder: (context, snapshot) {
@@ -138,44 +138,78 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
-  // Bottom bar with progress and media controls
   Widget _buildBottomControls() {
     return Column(
       children: [
-        // Progress bar (using media_kit built-in progress bar)
-        VideoProgressBar(player: player),
+        // Custom Progress Bar using Slider
+        StreamBuilder<Duration>(
+          stream: player.stream.position,
+          builder: (context, snapshot) {
+            final position = snapshot.data ?? Duration.zero;
+            final duration = player.state.duration;
+            final max = duration.inMilliseconds.toDouble();
+            final value = _isSeeking ? _dragValue : position.inMilliseconds.toDouble().clamp(0.0, max);
+
+            return Row(
+              children: [
+                const SizedBox(width: 16),
+                Text(_formatDuration(Duration(milliseconds: value.toInt())), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                Expanded(
+                  child: Slider(
+                    min: 0.0,
+                    max: max > 0 ? max : 1.0,
+                    value: value,
+                    activeColor: const Color(0xFF7158e2),
+                    inactiveColor: Colors.white24,
+                    onChangeStart: (_) {
+                      setState(() => _isSeeking = true);
+                    },
+                    onChanged: (v) {
+                      setState(() => _dragValue = v);
+                    },
+                    onChangeEnd: (v) {
+                      player.seek(Duration(milliseconds: v.toInt()));
+                      setState(() => _isSeeking = false);
+                      _startHideControlsTimer();
+                    },
+                  ),
+                ),
+                Text(_formatDuration(duration), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                const SizedBox(width: 16),
+              ],
+            );
+          },
+        ),
         
-        // Play/Pause and Seek buttons
+        // Buttons
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          padding: const EdgeInsets.only(bottom: 24.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildSeekButton(false), // Backward 10s
-              const SizedBox(width: 20),
+              _buildSeekButton(false),
+              const SizedBox(width: 24),
               _buildPlayPauseButton(),
-              const SizedBox(width: 20),
-              _buildSeekButton(true), // Forward 10s
+              const SizedBox(width: 24),
+              _buildSeekButton(true),
             ],
           ),
         ),
-        const SizedBox(height: 32.0),
       ],
     );
   }
   
   Widget _buildPlayPauseButton() {
-    return StreamBuilder<PlayerState>(
-      stream: player.stream.state,
+    return StreamBuilder<bool>(
+      stream: player.stream.playing,
       builder: (context, snapshot) {
-        final isPlaying = snapshot.data?.playing ?? false;
+        final isPlaying = snapshot.data ?? false;
         return FloatingActionButton(
           backgroundColor: const Color(0xFF7158e2),
           onPressed: player.playOrPause,
           child: FaIcon(
             isPlaying ? FontAwesomeIcons.pause : FontAwesomeIcons.play,
             color: Colors.white,
-            size: 20,
           ),
         );
       },
@@ -187,13 +221,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
       icon: FaIcon(
         forward ? FontAwesomeIcons.forwardStep : FontAwesomeIcons.backwardStep,
         color: Colors.white,
-        size: 30,
+        size: 28,
       ),
       onPressed: () {
         final position = player.state.position.inMilliseconds;
         final target = forward ? position + 10000 : position - 10000;
         player.seek(Duration(milliseconds: target));
-        _toggleControls();
+        _startHideControlsTimer();
       },
     );
   }
@@ -201,6 +235,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Widget _buildSettingsButton(Track? currentTrack) {
     return PopupMenuButton<String>(
       icon: const FaIcon(FontAwesomeIcons.cog, color: Colors.white),
+      color: const Color(0xFF1a0b2e),
       onSelected: (value) {
         if (value.startsWith('audio_')) {
           final index = int.parse(value.substring(6));
@@ -212,44 +247,29 @@ class _PlayerScreenState extends State<PlayerScreen> {
       },
       itemBuilder: (context) {
         List<PopupMenuEntry<String>> items = [];
-
-        // 1. Subtitle Tracks
+        // Subtitles
         if (currentTrack?.subtitle.isNotEmpty ?? false) {
-          items.add(const PopupMenuItem<String>(
-            enabled: false,
-            child: Text('الترجمات (Subtitles)', style: TextStyle(fontWeight: FontWeight.bold)),
-          ));
+          items.add(const PopupMenuItem(enabled: false, child: Text('الترجمة', style: TextStyle(color: Colors.grey))));
           for (var i = 0; i < currentTrack!.subtitle.length; i++) {
-            final track = currentTrack.subtitle[i];
-            items.add(PopupMenuItem<String>(
+            items.add(PopupMenuItem(
               value: 'subtitle_$i',
-              child: Text(track.title ?? (i == 0 ? 'Disabled' : 'Subtitle Track ${i + 1}')),
+              child: Text(currentTrack.subtitle[i].title ?? 'Track ${i+1}', style: const TextStyle(color: Colors.white)),
             ));
           }
         }
-
-        // 2. Audio Tracks
+        // Audio
         if (currentTrack?.audio.isNotEmpty ?? false) {
-          items.add(const PopupMenuItem<String>(
-            enabled: false,
-            child: Text('مسارات الصوت (Audio)', style: TextStyle(fontWeight: FontWeight.bold)),
-          ));
+          items.add(const PopupMenuItem(enabled: false, child: Text('الصوت', style: TextStyle(color: Colors.grey))));
           for (var i = 0; i < currentTrack!.audio.length; i++) {
-            final track = currentTrack.audio[i];
-            items.add(PopupMenuItem<String>(
+            items.add(PopupMenuItem(
               value: 'audio_$i',
-              child: Text(track.title ?? 'Audio Track ${i + 1}'),
+              child: Text(currentTrack.audio[i].title ?? 'Audio ${i+1}', style: const TextStyle(color: Colors.white)),
             ));
           }
         }
-
         if (items.isEmpty) {
-          items.add(const PopupMenuItem<String>(
-            enabled: false,
-            child: Text('No Extra Settings'),
-          ));
+          items.add(const PopupMenuItem(enabled: false, child: Text('لا توجد إعدادات', style: TextStyle(color: Colors.white))));
         }
-
         return items;
       },
     );
